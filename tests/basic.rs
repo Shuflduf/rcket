@@ -16,11 +16,15 @@ enum BinaryOperator {
 enum Literal {
     #[regex(r"\d+")]
     Int(i32),
+    #[regex(r"\d+\.\d+")]
+    Float(f32),
 }
+
 #[derive(Node, Debug)]
 enum Expression {
     Literal(Literal),
 }
+
 #[derive(Node, Debug)]
 struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
 
