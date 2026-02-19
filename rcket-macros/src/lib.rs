@@ -2,13 +2,38 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Fields, Ident, LitStr, Type, Variant,
-    parse_macro_input,
+    parse_macro_input, punctuated::Punctuated,
 };
 
-#[proc_macro_derive(Node, attributes(token, regex))]
+enum SeqKind {
+    Token,
+    Regex,
+}
+
+struct SeqItem {
+    kind: SeqKind,
+    lit: LitStr,
+}
+
+impl syn::parse::Parse for SeqItem {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let ident: Ident = input.parse()?;
+        let content;
+        syn::parenthesized!(content in input);
+        let lit: LitStr = content.parse()?;
+        let kind = if ident == "token" {
+            SeqKind::Token
+        } else {
+            SeqKind::Regex
+        };
+        Ok(SeqItem { kind, lit })
+    }
+}
+
+#[proc_macro_derive(Node, attributes(token, regex, seq))]
 pub fn derive_node(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
@@ -62,6 +87,20 @@ fn variant_arms(variant: &Variant) -> Vec<TokenStream2> {
                 let lit = attr.parse_args::<LitStr>().ok()?;
                 let ty = single_unnamed_field(variant)?;
                 Some(regex_arm(name, &lit, ty))
+            } else if attr.path().is_ident("seq") {
+                let items = attr
+                    .parse_args_with(Punctuated::<SeqItem, syn::Token![,]>::parse_terminated)
+                    .ok()?;
+                let field_types: Vec<&Type> = if let Fields::Unnamed(f) = &variant.fields {
+                    f.unnamed.iter().map(|f| &f.ty).collect()
+                } else {
+                    vec![]
+                };
+                Some(seq_arm(
+                    name,
+                    &items.into_iter().collect::<Vec<_>>(),
+                    &field_types,
+                ))
             } else {
                 None
             }
@@ -88,6 +127,45 @@ fn regex_arm(name: &Ident, lit: &LitStr, ty: &Type) -> TokenStream2 {
                     }
                 }
             }
+        }
+    }
+}
+
+fn seq_arm(name: &Ident, items: &[SeqItem], field_types: &[&Type]) -> TokenStream2 {
+    let mut steps = vec![];
+    let mut field_bindings: Vec<Ident> = vec![];
+    let mut field_idx = 0usize;
+
+    for item in items {
+        match item.kind {
+            SeqKind::Token => {
+                let lit = &item.lit;
+                steps.push(quote! { let rest = rest.strip_prefix(#lit)?; });
+            }
+            SeqKind::Regex => {
+                let lit = &item.lit;
+                let ty = field_types[field_idx];
+                let binding = format_ident!("field_{}", field_idx);
+                field_bindings.push(binding.clone());
+                steps.push(quote! {
+                    let re = ::regex::Regex::new(#lit).unwrap();
+                    let m = re.find(rest)?;
+                    if m.start() != 0 { return None; }
+                    let #binding = rest[..m.end()].parse::<#ty>().ok()?;
+                    let rest = &rest[m.end()..];
+                });
+                field_idx += 1;
+            }
+        }
+    }
+
+    quote! {
+        if let Some(result) = (|| -> Option<Self> {
+            let rest = input;
+            #(#steps)*
+            if rest.is_empty() { Some(Self::#name(#(#field_bindings),*)) } else { None }
+        })() {
+            return Some(result);
         }
     }
 }

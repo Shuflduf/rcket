@@ -18,6 +18,8 @@ enum Literal {
     Int(i32),
     #[regex(r"\d+\.\d+")]
     Float(f32),
+    #[seq(token("\""), regex(r#"[^"]*"#), token("\""))]
+    String(String),
 }
 
 #[derive(Node, Debug, PartialEq)]
@@ -30,8 +32,20 @@ struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
 
 #[test]
 fn parse_int() {
-    let value = Literal::parse("5").unwrap();
-    assert_eq!(value, Literal::Int(5));
+    let value = Literal::parse("1225").unwrap();
+    assert_eq!(value, Literal::Int(1225));
+}
+
+#[test]
+fn parse_float() {
+    let value = Literal::parse("3.1415").unwrap();
+    assert_eq!(value, Literal::Float(3.1415));
+}
+
+#[test]
+fn parse_string() {
+    let value = Literal::parse("\"froging it\"").unwrap();
+    assert_eq!(value, Literal::String("froging it".to_string()));
 }
 
 #[test]
