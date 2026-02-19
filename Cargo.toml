@@ -7,3 +7,4 @@ license = "MIT"
 
 [dependencies]
 rcket-macros = { path = "rcket-macros" }
+regex = "1.12.3"

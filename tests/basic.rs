@@ -29,7 +29,13 @@ enum Expression {
 struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
 
 #[test]
-fn parse_token() {
+fn parse_int() {
+    let value = Literal::parse("5").unwrap();
+    assert_eq!(value, Literal::Int(5));
+}
+
+#[test]
+fn parse_operation() {
     let (first, op, second) = BinaryOperation::parse("5+2").unwrap();
     assert_eq!(*first, Expression::Literal(Literal::Int(5)));
     assert_eq!(op, BinaryOperator::Add);
