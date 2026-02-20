@@ -1,11 +1,10 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DataEnum, DeriveInput, Ident, LitStr, Type,
-    parse_macro_input, punctuated::Punctuated,
+    Data, DataEnum, DeriveInput, Ident, LitStr, Type, parse_macro_input, punctuated::Punctuated,
 };
 
-use crate::single_unnamed_field;
+use crate::node::single_unnamed_field;
 
 pub(crate) struct LexPattern {
     kind: LexPatternKind,
