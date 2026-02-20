@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident, Path, PathArguments,
-    Type, Variant, parse_macro_input,
+    Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident, Index, Path,
+    PathArguments, Type, Variant, parse_macro_input,
 };
 
 pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
@@ -26,9 +26,15 @@ pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
         .unwrap_or_else(|| Ident::new("Token", proc_macro2::Span::call_site()));
 
     let (output_type, parse_body) = match &input.data {
-        Data::Struct(data_struct) => derive_struct(data_struct, type_name),
+        Data::Struct(data_struct) => derive_struct(data_struct, type_name, &token_type),
         Data::Enum(data_enum) => derive_enum(data_enum, &token_type),
         _ => (quote! { Self }, quote! { todo!() }),
+    };
+
+    let display_impl = match &input.data {
+        Data::Struct(data_struct) => display_impl_struct(data_struct, type_name),
+        Data::Enum(data_enum) => display_impl_enum(data_enum, type_name),
+        _ => quote! {},
     };
 
     quote! {
@@ -39,6 +45,7 @@ pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
                 #parse_body
             }
         }
+        #display_impl
     }
     .into()
 }
@@ -46,26 +53,42 @@ pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
 fn derive_struct(
     data_struct: &DataStruct,
     type_name: &Ident,
+    token_type: &Ident,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
-    let field_types: Vec<&Type> = match &data_struct.fields {
-        Fields::Unnamed(fields) => fields.unnamed.iter().map(|field| &field.ty).collect(),
-        Fields::Named(fields) => fields.named.iter().map(|field| &field.ty).collect(),
+    let fields: Vec<&syn::Field> = match &data_struct.fields {
+        Fields::Unnamed(fields) => fields.unnamed.iter().collect(),
+        Fields::Named(fields) => fields.named.iter().collect(),
         Fields::Unit => vec![],
     };
 
     let mut parse_steps = vec![];
     let mut field_bindings: Vec<Ident> = vec![];
 
-    for (field_index, field_type) in field_types.iter().enumerate() {
+    for (field_index, field) in fields.iter().enumerate() {
         let binding = format_ident!("field_{}", field_index);
         field_bindings.push(binding.clone());
 
-        if let Some(inner_type) = unwrap_box(field_type) {
+        let token_attribute = field.attrs.iter().find(|attribute| attribute.path().is_ident("token"));
+
+        if let Some(token_attribute) = token_attribute {
+            let path = token_attribute.parse_args::<Path>().unwrap();
+            let first_segment_ident = &path.segments[0].ident;
+            let token_pattern = if first_segment_ident == "Symbol" {
+                quote! { #token_type::Symbol(#path) }
+            } else {
+                quote! { #token_type::Keyword(#path) }
+            };
+            parse_steps.push(quote! {
+                let tokens = if let Some((#token_pattern, rest)) = tokens.split_first() { rest } else { return None; };
+                let #binding = ();
+            });
+        } else if let Some(inner_type) = unwrap_box(&field.ty) {
             parse_steps.push(quote! {
                 let (#binding, tokens) = <#inner_type as ::rcket::Node>::parse_one(tokens)?;
                 let #binding = ::std::boxed::Box::new(#binding);
             });
         } else {
+            let field_type = &field.ty;
             parse_steps.push(quote! {
                 let (#binding, tokens) = <#field_type as ::rcket::Node>::parse_one(tokens)?;
             });
@@ -177,4 +200,75 @@ fn unwrap_box(field_type: &Type) -> Option<&Type> {
         }
     }
     None
+}
+
+fn display_impl_struct(data_struct: &DataStruct, type_name: &Ident) -> proc_macro2::TokenStream {
+    let type_name_str = type_name.to_string();
+
+    let field_writes: Vec<proc_macro2::TokenStream> = match &data_struct.fields {
+        Fields::Unnamed(fields) => fields
+            .unnamed
+            .iter()
+            .enumerate()
+            .filter(|(_, field)| !field.attrs.iter().any(|attribute| attribute.path().is_ident("token")))
+            .map(|(field_index, _)| {
+                let index = Index::from(field_index);
+                quote! { write!(formatter, " {}", self.#index)?; }
+            })
+            .collect(),
+        Fields::Named(fields) => fields
+            .named
+            .iter()
+            .filter(|field| !field.attrs.iter().any(|attribute| attribute.path().is_ident("token")))
+            .map(|field| {
+                let field_name = field.ident.as_ref().unwrap();
+                quote! { write!(formatter, " {}", self.#field_name)?; }
+            })
+            .collect(),
+        Fields::Unit => vec![],
+    };
+
+    quote! {
+        impl ::std::fmt::Display for #type_name {
+            fn fmt(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                write!(formatter, "({}",  #type_name_str)?;
+                #(#field_writes)*
+                write!(formatter, ")")
+            }
+        }
+    }
+}
+
+fn display_impl_enum(data_enum: &DataEnum, type_name: &Ident) -> proc_macro2::TokenStream {
+    let match_arms: Vec<proc_macro2::TokenStream> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_name = &variant.ident;
+            let variant_name_str = variant_name.to_string();
+
+            let has_token = variant.attrs.iter().any(|attribute| attribute.path().is_ident("token"));
+            let has_extract = variant.attrs.iter().any(|attribute| attribute.path().is_ident("extract"));
+
+            if has_token {
+                quote! { Self::#variant_name => write!(formatter, #variant_name_str), }
+            } else if has_extract {
+                quote! { Self::#variant_name(value) => write!(formatter, "({} {})", #variant_name_str, value), }
+            } else if single_unnamed_field(variant).is_some() {
+                quote! { Self::#variant_name(inner) => ::std::fmt::Display::fmt(inner, formatter), }
+            } else {
+                quote! { Self::#variant_name => write!(formatter, #variant_name_str), }
+            }
+        })
+        .collect();
+
+    quote! {
+        impl ::std::fmt::Display for #type_name {
+            fn fmt(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                match self {
+                    #(#match_arms)*
+                }
+            }
+        }
+    }
 }
