@@ -1,4 +1,8 @@
-use rcket::{Node, lexer::lex};
+use rcket::{Lex, Node};
+
+#[path = "frg_lexer_types.rs"]
+mod frg_lexer_types;
+use frg_lexer_types::{Literal, Symbol, Token};
 
 #[derive(Node, Debug, PartialEq)]
 enum BinaryOperator {
@@ -13,7 +17,7 @@ enum BinaryOperator {
 }
 
 #[derive(Node, Debug, PartialEq)]
-enum Literal {
+enum LiteralValue {
     #[extract(Literal::Int)]
     Int(i32),
     #[extract(Literal::Float)]
@@ -24,7 +28,7 @@ enum Literal {
 
 #[derive(Node, Debug, PartialEq)]
 enum Expression {
-    Literal(Literal),
+    LiteralValue(LiteralValue),
     BinaryOperation(BinaryOperation),
 }
 
@@ -33,18 +37,18 @@ struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
 
 #[test]
 fn parse_int() {
-    let tokens = lex("1225");
-    let value = Literal::parse_all(&tokens).unwrap();
-    assert_eq!(value, Literal::Int(1225));
+    let tokens = Token::lex("1225");
+    let value = LiteralValue::parse_all(&tokens).unwrap();
+    assert_eq!(value, LiteralValue::Int(1225));
 }
 
 #[test]
 fn parse_float() {
-    let tokens = lex("3.1415");
-    let value = Literal::parse_all(&tokens).unwrap();
+    let tokens = Token::lex("3.1415");
+    let value = LiteralValue::parse_all(&tokens).unwrap();
     assert_eq!(
         value,
-        Literal::Float(
+        LiteralValue::Float(
             #[allow(clippy::approx_constant)]
             3.1415
         )
@@ -53,16 +57,16 @@ fn parse_float() {
 
 #[test]
 fn parse_string() {
-    let tokens = lex(r#""froging it""#);
-    let value = Literal::parse_all(&tokens).unwrap();
-    assert_eq!(value, Literal::Str("froging it".to_string()));
+    let tokens = Token::lex(r#""froging it""#);
+    let value = LiteralValue::parse_all(&tokens).unwrap();
+    assert_eq!(value, LiteralValue::Str("froging it".to_string()));
 }
 
 #[test]
 fn parse_operation() {
-    let tokens = lex("5+2");
+    let tokens = Token::lex("5+2");
     let (BinaryOperation(first, op, second), _) = BinaryOperation::parse(&tokens).unwrap();
-    assert_eq!(*first, Expression::Literal(Literal::Int(5)));
+    assert_eq!(*first, Expression::LiteralValue(LiteralValue::Int(5)));
     assert_eq!(op, BinaryOperator::Add);
-    assert_eq!(*second, Expression::Literal(Literal::Int(2)));
+    assert_eq!(*second, Expression::LiteralValue(LiteralValue::Int(2)));
 }
