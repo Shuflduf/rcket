@@ -25,9 +25,10 @@ enum Literal {
 #[derive(Node, Debug, PartialEq)]
 enum Expression {
     Literal(Literal),
+    BinaryOperation(BinaryOperation),
 }
 
-#[derive(Node, Debug)]
+#[derive(Node, Debug, PartialEq)]
 struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
 
 #[test]
