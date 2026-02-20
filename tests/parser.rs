@@ -38,14 +38,14 @@ struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
 #[test]
 fn parse_int() {
     let tokens = Token::lex("1225");
-    let value = LiteralValue::parse_all(&tokens).unwrap();
+    let value = LiteralValue::parse(&tokens).unwrap();
     assert_eq!(value, LiteralValue::Int(1225));
 }
 
 #[test]
 fn parse_float() {
     let tokens = Token::lex("3.1415");
-    let value = LiteralValue::parse_all(&tokens).unwrap();
+    let value = LiteralValue::parse(&tokens).unwrap();
     assert_eq!(
         value,
         LiteralValue::Float(
@@ -58,7 +58,7 @@ fn parse_float() {
 #[test]
 fn parse_string() {
     let tokens = Token::lex(r#""froging it""#);
-    let value = LiteralValue::parse_all(&tokens).unwrap();
+    let value = LiteralValue::parse(&tokens).unwrap();
     assert_eq!(value, LiteralValue::Str("froging it".to_string()));
 }
 
