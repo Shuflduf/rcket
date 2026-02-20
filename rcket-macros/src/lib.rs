@@ -1,53 +1,27 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 
-use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DataEnum, DataStruct, DeriveInput, Fields, Ident, LitStr, Type, Variant,
-    parse_macro_input, punctuated::Punctuated,
+    Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident, Path, PathArguments,
+    Type, Variant, parse_macro_input,
 };
 
-enum SeqKind {
-    Token,
-    Regex,
-}
-
-struct SeqItem {
-    kind: SeqKind,
-    lit: LitStr,
-}
-
-impl syn::parse::Parse for SeqItem {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let ident: Ident = input.parse()?;
-        let content;
-        syn::parenthesized!(content in input);
-        let lit: LitStr = content.parse()?;
-        let kind = if ident == "token" {
-            SeqKind::Token
-        } else {
-            SeqKind::Regex
-        };
-        Ok(SeqItem { kind, lit })
-    }
-}
-
-#[proc_macro_derive(Node, attributes(token, regex, seq))]
+#[proc_macro_derive(Node, attributes(token, extract))]
 pub fn derive_node(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
+    let type_name = &input.ident;
 
     let (output_type, parse_body) = match &input.data {
-        Data::Struct(s) => derive_struct(s),
-        Data::Enum(e) => derive_enum(e),
+        Data::Struct(data_struct) => derive_struct(data_struct, type_name),
+        Data::Enum(data_enum) => derive_enum(data_enum),
         _ => (quote! { Self }, quote! { todo!() }),
     };
 
     quote! {
-        impl Node for #name {
+        impl ::rcket::Node for #type_name {
             type Output = #output_type;
-            fn parse(input: &str) -> Option<Self::Output> {
+            fn parse(tokens: &[::rcket::lexer_types::Token]) -> Option<(Self::Output, &[::rcket::lexer_types::Token])> {
                 #parse_body
             }
         }
@@ -55,117 +29,107 @@ pub fn derive_node(input: TokenStream) -> TokenStream {
     .into()
 }
 
-fn derive_struct(s: &DataStruct) -> (TokenStream2, TokenStream2) {
-    let types: Vec<&Type> = match &s.fields {
-        Fields::Unnamed(f) => f.unnamed.iter().map(|f| &f.ty).collect(),
-        Fields::Named(f) => f.named.iter().map(|f| &f.ty).collect(),
+fn derive_struct(
+    data_struct: &DataStruct,
+    type_name: &Ident,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+    let field_types: Vec<&Type> = match &data_struct.fields {
+        Fields::Unnamed(fields) => fields.unnamed.iter().map(|field| &field.ty).collect(),
+        Fields::Named(fields) => fields.named.iter().map(|field| &field.ty).collect(),
         Fields::Unit => vec![],
     };
-    let output_type = match types.len() {
-        0 => quote! { () },
-        1 => quote! { #(#types)* },
-        _ => quote! { (#(#types),*) },
+
+    let mut parse_steps = vec![];
+    let mut field_bindings: Vec<Ident> = vec![];
+
+    for (field_index, field_type) in field_types.iter().enumerate() {
+        let binding = format_ident!("field_{}", field_index);
+        field_bindings.push(binding.clone());
+
+        if let Some(inner_type) = unwrap_box(field_type) {
+            parse_steps.push(quote! {
+                let (#binding, tokens) = <#inner_type as ::rcket::Node>::parse(tokens)?;
+                let #binding = ::std::boxed::Box::new(#binding);
+            });
+        } else {
+            parse_steps.push(quote! {
+                let (#binding, tokens) = <#field_type as ::rcket::Node>::parse(tokens)?;
+            });
+        }
+    }
+
+    let parse_body = quote! {
+        (|| -> Option<_> {
+            #(#parse_steps)*
+            Some((#type_name(#(#field_bindings),*), tokens))
+        })()
     };
-    (output_type, quote! { todo!() })
+
+    (quote! { Self }, parse_body)
 }
 
-fn derive_enum(e: &DataEnum) -> (TokenStream2, TokenStream2) {
-    let arms: Vec<TokenStream2> = e.variants.iter().flat_map(variant_arms).collect();
-    (quote! { Self }, quote! { #(#arms)* None })
+fn derive_enum(data_enum: &DataEnum) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+    let variant_match_arms: Vec<proc_macro2::TokenStream> =
+        data_enum.variants.iter().flat_map(variant_arms).collect();
+    (quote! { Self }, quote! { #(#variant_match_arms)* None })
 }
 
-fn variant_arms(variant: &Variant) -> Vec<TokenStream2> {
-    let name = &variant.ident;
-    variant
+fn variant_arms(variant: &Variant) -> Vec<proc_macro2::TokenStream> {
+    let variant_name = &variant.ident;
+
+    let attribute_arms: Vec<proc_macro2::TokenStream> = variant
         .attrs
         .iter()
-        .filter_map(|attr| {
-            if attr.path().is_ident("token") {
-                let lit = attr.parse_args::<LitStr>().ok()?;
-                token_arm(name, &lit)
-            } else if attr.path().is_ident("regex") {
-                let lit = attr.parse_args::<LitStr>().ok()?;
-                let ty = single_unnamed_field(variant)?;
-                Some(regex_arm(name, &lit, ty))
-            } else if attr.path().is_ident("seq") {
-                let items = attr
-                    .parse_args_with(Punctuated::<SeqItem, syn::Token![,]>::parse_terminated)
-                    .ok()?;
-                let field_types: Vec<&Type> = if let Fields::Unnamed(f) = &variant.fields {
-                    f.unnamed.iter().map(|f| &f.ty).collect()
-                } else {
-                    vec![]
-                };
-                Some(seq_arm(
-                    name,
-                    &items.into_iter().collect::<Vec<_>>(),
-                    &field_types,
-                ))
+        .filter_map(|attribute| {
+            if attribute.path().is_ident("token") {
+                let path = attribute.parse_args::<Path>().ok()?;
+                Some(token_arm(variant_name, &path))
+            } else if attribute.path().is_ident("extract") {
+                let path = attribute.parse_args::<Path>().ok()?;
+                Some(extract_arm(variant_name, &path))
             } else {
                 None
             }
         })
-        .collect()
+        .collect();
+
+    if !attribute_arms.is_empty() {
+        return attribute_arms;
+    }
+
+    if let Some(inner_type) = single_unnamed_field(variant) {
+        vec![bare_arm(variant_name, inner_type)]
+    } else {
+        vec![]
+    }
 }
 
-fn token_arm(name: &Ident, lit: &LitStr) -> Option<TokenStream2> {
-    Some(quote! {
-        if input == #lit {
-            return Some(Self::#name);
-        }
-    })
-}
-
-fn regex_arm(name: &Ident, lit: &LitStr, ty: &Type) -> TokenStream2 {
+fn token_arm(variant_name: &Ident, path: &Path) -> proc_macro2::TokenStream {
+    let first_segment_ident = &path.segments[0].ident;
+    let token_pattern = if first_segment_ident == "Symbol" {
+        quote! { ::rcket::lexer_types::Token::Symbol(::rcket::lexer_types::#path) }
+    } else {
+        quote! { ::rcket::lexer_types::Token::Keyword(::rcket::lexer_types::#path) }
+    };
     quote! {
-        {
-            let re = ::regex::Regex::new(#lit).unwrap();
-            if let Some(m) = re.find(input) {
-                if m.start() == 0 && m.end() == input.len() {
-                    if let Ok(val) = input.parse::<#ty>() {
-                        return Some(Self::#name(val));
-                    }
-                }
-            }
+        if let Some((#token_pattern, rest)) = tokens.split_first() {
+            return Some((Self::#variant_name, rest));
         }
     }
 }
 
-fn seq_arm(name: &Ident, items: &[SeqItem], field_types: &[&Type]) -> TokenStream2 {
-    let mut steps = vec![];
-    let mut field_bindings: Vec<Ident> = vec![];
-    let mut field_idx = 0usize;
-
-    for item in items {
-        match item.kind {
-            SeqKind::Token => {
-                let lit = &item.lit;
-                steps.push(quote! { let rest = rest.strip_prefix(#lit)?; });
-            }
-            SeqKind::Regex => {
-                let lit = &item.lit;
-                let ty = field_types[field_idx];
-                let binding = format_ident!("field_{}", field_idx);
-                field_bindings.push(binding.clone());
-                steps.push(quote! {
-                    let re = ::regex::Regex::new(#lit).unwrap();
-                    let m = re.find(rest)?;
-                    if m.start() != 0 { return None; }
-                    let #binding = rest[..m.end()].parse::<#ty>().ok()?;
-                    let rest = &rest[m.end()..];
-                });
-                field_idx += 1;
-            }
+fn extract_arm(variant_name: &Ident, path: &Path) -> proc_macro2::TokenStream {
+    quote! {
+        if let Some((::rcket::lexer_types::Token::Literal(::rcket::lexer_types::#path(value)), rest)) = tokens.split_first() {
+            return Some((Self::#variant_name(value.clone()), rest));
         }
     }
+}
 
+fn bare_arm(variant_name: &Ident, inner_type: &Type) -> proc_macro2::TokenStream {
     quote! {
-        if let Some(result) = (|| -> Option<Self> {
-            let rest = input;
-            #(#steps)*
-            if rest.is_empty() { Some(Self::#name(#(#field_bindings),*)) } else { None }
-        })() {
-            return Some(result);
+        if let Some((result, rest)) = <#inner_type as ::rcket::Node>::parse(tokens) {
+            return Some((Self::#variant_name(result), rest));
         }
     }
 }
@@ -174,6 +138,22 @@ fn single_unnamed_field(variant: &Variant) -> Option<&Type> {
     if let Fields::Unnamed(fields) = &variant.fields {
         if fields.unnamed.len() == 1 {
             return Some(&fields.unnamed[0].ty);
+        }
+    }
+    None
+}
+
+fn unwrap_box(field_type: &Type) -> Option<&Type> {
+    if let Type::Path(type_path) = field_type {
+        let segments = &type_path.path.segments;
+        if segments.len() == 1 && segments[0].ident == "Box" {
+            if let PathArguments::AngleBracketed(angle_args) = &segments[0].arguments {
+                if angle_args.args.len() == 1 {
+                    if let GenericArgument::Type(inner_type) = &angle_args.args[0] {
+                        return Some(inner_type);
+                    }
+                }
+            }
         }
     }
     None

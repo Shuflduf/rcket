@@ -13,7 +13,7 @@ pub fn lex(input: &str) -> Vec<Token> {
         if current_char == '"' {
             chars.next();
             let mut string_content = String::new();
-            while let Some((_, character)) = chars.next() {
+            for (_, character) in chars.by_ref() {
                 if character == '"' {
                     break;
                 }
