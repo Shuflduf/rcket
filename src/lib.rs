@@ -3,10 +3,10 @@ pub use rcket_macros::{Lex, Node};
 pub trait Node {
     type Token;
     type Output;
-    fn parse(tokens: &[Self::Token]) -> Option<(Self::Output, &[Self::Token])>;
+    fn parse_one(tokens: &[Self::Token]) -> Option<(Self::Output, &[Self::Token])>;
 
     fn parse_all(tokens: &[Self::Token]) -> Option<Self::Output> {
-        let (result, rest) = Self::parse(tokens)?;
+        let (result, rest) = Self::parse_one(tokens)?;
         if rest.is_empty() { Some(result) } else { None }
     }
 }

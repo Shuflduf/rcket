@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 mod lex;
 mod node;
 
-#[proc_macro_derive(Node, attributes(token, extract))]
+#[proc_macro_derive(Node, attributes(token, extract, node))]
 pub fn derive_node(input: TokenStream) -> TokenStream {
     node::derive_node(input)
 }

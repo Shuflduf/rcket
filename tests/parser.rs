@@ -65,7 +65,7 @@ fn parse_string() {
 #[test]
 fn parse_operation() {
     let tokens = Token::lex("5+2");
-    let (BinaryOperation(first, op, second), _) = BinaryOperation::parse(&tokens).unwrap();
+    let (BinaryOperation(first, op, second), _) = BinaryOperation::parse_one(&tokens).unwrap();
     assert_eq!(*first, Expression::LiteralValue(LiteralValue::Int(5)));
     assert_eq!(op, BinaryOperator::Add);
     assert_eq!(*second, Expression::LiteralValue(LiteralValue::Int(2)));
