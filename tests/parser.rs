@@ -17,19 +17,18 @@ enum VarType {
 }
 
 #[derive(Node, Debug, PartialEq)]
-enum BinaryOperator {
-    #[token(Symbol::Plus)]
-    Add,
-    #[token(Symbol::Minus)]
-    Subtract,
-    #[token(Symbol::Star)]
-    Multiply,
-    #[token(Symbol::FSlash)]
-    Divide,
-}
+struct AdditionOperation(Box<Expression>, #[token(Symbol::Plus)] (), Box<Expression>);
 
 #[derive(Node, Debug, PartialEq)]
-struct BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>);
+struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<Expression>);
+
+#[derive(Node, Debug, PartialEq)]
+enum BinaryOperation {
+    // #[prec(1)]
+    AdditionOperation(AdditionOperation),
+    // #[prec(2)]
+    MultiplicationOperation(MultiplicationOperation),
+}
 
 #[derive(Node, Debug, PartialEq)]
 enum Expression {
@@ -76,17 +75,32 @@ fn parse_float() {
 #[test]
 fn parse_string() {
     let value = Expression::parse(&Token::lex(r#""froging it""#)).unwrap();
-    assert_eq!(value.to_string(), "(String froging it)");
+    assert_eq!(value.to_string(), "(Expression (String (froging it)))");
 }
 
 #[test]
-fn parse_operation() {
-    let (node, _) = BinaryOperation::parse_one(&Token::lex("5+2")).unwrap();
-    assert_eq!(node.to_string(), "(BinaryOperation (Int 5) Add (Int 2))");
+fn parse_add_operation() {
+    let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
+    assert_eq!(
+        node.to_string(),
+        "(BinaryOperation (AdditionOperation (Int (5) Int (2)))"
+    );
+}
+#[test]
+fn parse_mult_operation() {
+    let node = BinaryOperation::parse(&Token::lex("7*3")).unwrap();
+    println!("{node:#?}");
+    assert_eq!(
+        node.to_string(),
+        "(BinaryOperation (MultiplicationOperation (Int (7) Int (3))))"
+    );
 }
 
 #[test]
 fn parse_variable_dec() {
-    let node = Statement::parse(&Token::lex("int thing = 5")).unwrap();
-    assert_eq!(node.to_string(), "(VariableDeclaration Int thing (Int 5))")
+    let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
+    assert_eq!(
+        node.to_string(),
+        "(VariableDeclaration (Int thing Int (5)))"
+    )
 }

@@ -68,17 +68,24 @@ fn derive_struct(
         let binding = format_ident!("field_{}", field_index);
         field_bindings.push(binding.clone());
 
-        let token_attribute = field.attrs.iter().find(|attribute| attribute.path().is_ident("token"));
-        let extract_attribute = field.attrs.iter().find(|attribute| attribute.path().is_ident("extract"));
+        let token_attribute = field
+            .attrs
+            .iter()
+            .find(|attribute| attribute.path().is_ident("token"));
+        let extract_attribute = field
+            .attrs
+            .iter()
+            .find(|attribute| attribute.path().is_ident("extract"));
 
         if let Some(token_attribute) = token_attribute {
             let path = token_attribute.parse_args::<Path>().unwrap();
             let first_segment_ident = &path.segments[0].ident;
-            let token_pattern = if first_segment_ident == "Symbol" {
-                quote! { #token_type::Symbol(#path) }
-            } else {
-                quote! { #token_type::Keyword(#path) }
-            };
+            let token_pattern = quote! { #token_type::#first_segment_ident(#path) };
+            // let token_pattern = if first_segment_ident == "Symbol" {
+            //     quote! { #token_type::Symbol(#path) }
+            // } else {
+            //     quote! { #token_type::Keyword(#path) }
+            // };
             parse_steps.push(quote! {
                 let tokens = if let Some((#token_pattern, rest)) = tokens.split_first() { rest } else { return None; };
                 let #binding = ();
@@ -218,7 +225,12 @@ fn display_impl_struct(data_struct: &DataStruct, type_name: &Ident) -> proc_macr
             .unnamed
             .iter()
             .enumerate()
-            .filter(|(_, field)| !field.attrs.iter().any(|attribute| attribute.path().is_ident("token")))
+            .filter(|(_, field)| {
+                !field
+                    .attrs
+                    .iter()
+                    .any(|attribute| attribute.path().is_ident("token"))
+            })
             .map(|(field_index, _)| {
                 let index = Index::from(field_index);
                 quote! { write!(formatter, " {}", self.#index)?; }
@@ -227,7 +239,12 @@ fn display_impl_struct(data_struct: &DataStruct, type_name: &Ident) -> proc_macr
         Fields::Named(fields) => fields
             .named
             .iter()
-            .filter(|field| !field.attrs.iter().any(|attribute| attribute.path().is_ident("token")))
+            .filter(|field| {
+                !field
+                    .attrs
+                    .iter()
+                    .any(|attribute| attribute.path().is_ident("token"))
+            })
             .map(|field| {
                 let field_name = field.ident.as_ref().unwrap();
                 quote! { write!(formatter, " {}", self.#field_name)?; }
