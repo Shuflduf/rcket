@@ -1,9 +1,9 @@
 use proc_macro::TokenStream;
 use proc_macro_error::{abort, emit_error, emit_warning};
-use quote::{ToTokens, format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
-    Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident, Index, Path,
-    PathArguments, Type, Variant, parse_macro_input,
+    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident,
+    Index, Path, PathArguments, Type, Variant,
 };
 
 pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
@@ -225,6 +225,18 @@ fn unwrap_box(field_type: &Type) -> Option<&Type> {
     None
 }
 
+fn is_unit_type(ty: &Type) -> bool {
+    if let Type::Path(type_path) = ty {
+        if type_path.qself.is_none() && type_path.path.segments.len() == 1 {
+            let segment = type_path.path.segments.first().unwrap();
+            if segment.ident == "()" && segment.arguments.is_empty() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn display_impl_struct(data_struct: &DataStruct, type_name: &Ident) -> proc_macro2::TokenStream {
     let type_name_str = type_name.to_string();
 
@@ -239,25 +251,75 @@ fn display_impl_struct(data_struct: &DataStruct, type_name: &Ident) -> proc_macr
                     .iter()
                     .any(|attribute| attribute.path().is_ident("token"))
             })
-            .map(|(field_index, _)| {
-                let index = Index::from(field_index);
-                quote! { write!(formatter, " {}", self.#index)?; }
-            })
-            .collect(),
-        Fields::Named(fields) => fields
-            .named
-            .iter()
-            .filter(|field| {
-                !field
+            .enumerate()
+            .map(|(i, (original_idx, field))| {
+                let original_index = Index::from(original_idx);
+                let has_token_attr = field
                     .attrs
                     .iter()
-                    .any(|attribute| attribute.path().is_ident("token"))
-            })
-            .map(|field| {
-                let field_name = field.ident.as_ref().unwrap();
-                quote! { write!(formatter, " {}", self.#field_name)?; }
+                    .any(|attribute| attribute.path().is_ident("token"));
+                if has_token_attr {
+                    if i == 0 {
+                        quote! {}
+                    } else {
+                        quote! {}
+                    }
+                } else if let Some(_) = unwrap_box(&field.ty) {
+                    if i == 0 {
+                        quote! { write!(formatter, " {}", self.#original_index)?; }
+                    } else {
+                        quote! { write!(formatter, " {}", self.#original_index)?; }
+                    }
+                } else if is_unit_type(&field.ty) {
+                    if i == 0 {
+                        quote! { write!(formatter, "{}", self.#original_index)?; }
+                    } else {
+                        quote! { write!(formatter, " {}", self.#original_index)?; }
+                    }
+                } else {
+                    if i == 0 {
+                        quote! { write!(formatter, "{}", self.#original_index)?; }
+                    } else {
+                        quote! { write!(formatter, " {}", self.#original_index)?; }
+                    }
+                }
             })
             .collect(),
+        Fields::Named(fields) => {
+            let non_token_fields: Vec<_> = fields
+                .named
+                .iter()
+                .filter(|field| {
+                    !field
+                        .attrs
+                        .iter()
+                        .any(|attribute| attribute.path().is_ident("token"))
+                })
+                .collect();
+            non_token_fields
+                .iter()
+                .enumerate()
+                .map(|(i, field)| {
+                    let field_name = field.ident.as_ref().unwrap();
+                    if let Some(_) = unwrap_box(&field.ty) {
+                        if i == 0 {
+                            quote! { ::std::fmt::Display::fmt(self.#field_name.as_ref(), formatter)?; }
+                        } else {
+                            quote! { write!(formatter, " ")?;
+                                 ::std::fmt::Display::fmt(self.#field_name.as_ref(), formatter)?; }
+                        }
+                    } else if is_unit_type(&field.ty) {
+                        quote! {}
+                    } else {
+                        if i == 0 {
+                            quote! { write!(formatter, "{}", self.#field_name)?; }
+                        } else {
+                            quote! { write!(formatter, " {}", self.#field_name)?; }
+                        }
+                    }
+                })
+                .collect()
+        }
         Fields::Unit => vec![],
     };
 
@@ -296,7 +358,7 @@ fn display_impl_enum(data_enum: &DataEnum, type_name: &Ident) -> proc_macro2::To
             } else if has_extract {
                 quote! { Self::#variant_name(value) => write!(formatter, "({} ({} ({})))", #type_name_str, #variant_name_str, value), }
             } else if single_unnamed_field(variant).is_some() {
-                quote! { Self::#variant_name(inner) => ::std::fmt::Display::fmt(inner, formatter), }
+                quote! { Self::#variant_name(inner) => write!(formatter, "({} {})", #type_name_str, inner), }
             } else {
                 quote! { Self::#variant_name => write!(formatter, #variant_name_str), }
             }

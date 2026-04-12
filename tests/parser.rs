@@ -4,20 +4,20 @@ use rcket::{Lex, Node};
 mod frg_lexer_types;
 use frg_lexer_types::{Keyword, Literal, Symbol, Token};
 
-// #[derive(Node, Debug, PartialEq)]
-// enum VarType {
-//     #[token(Keyword::Int)]
-//     Int,
-//     #[token(Keyword::Float)]
-//     Float,
-//     #[token(Keyword::Str)]
-//     Str,
-//     #[token(Keyword::Bool)]
-//     Bool,
-// }
+#[derive(Node, Debug, PartialEq)]
+enum VarType {
+    #[token(Keyword::Int)]
+    Int,
+    #[token(Keyword::Float)]
+    Float,
+    #[token(Keyword::Str)]
+    Str,
+    #[token(Keyword::Bool)]
+    Bool,
+}
 
-// #[derive(Node, Debug, PartialEq)]
-// struct AdditionOperation(Box<Expression>, #[token(Symbol::Plus)] (), Box<Expression>);
+#[derive(Node, Debug, PartialEq)]
+struct AdditionOperation(Box<Expression>, #[token(Symbol::Plus)] (), Box<Expression>);
 
 #[derive(Node, Debug, PartialEq)]
 struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<Expression>);
@@ -25,7 +25,7 @@ struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<E
 #[derive(Node, Debug, PartialEq)]
 enum BinaryOperation {
     // #[prec(1)]
-    // AdditionOperation(AdditionOperation),
+    AdditionOperation(AdditionOperation),
     // #[prec(2)]
     MultiplicationOperation(MultiplicationOperation),
 }
@@ -41,13 +41,13 @@ enum Expression {
     // BinaryOperation(BinaryOperation),
 }
 
-// #[derive(Node, Debug, PartialEq)]
-// struct VariableDeclaration(
-//     VarType,
-//     #[extract(Literal::Identifier)] String,
-//     #[token(Symbol::Equals)] (),
-//     Expression,
-// );
+#[derive(Node, Debug, PartialEq)]
+struct VariableDeclaration(
+    VarType,
+    #[extract(Literal::Identifier)] String,
+    #[token(Symbol::Equals)] (),
+    Expression,
+);
 
 // #[derive(Node, Debug, PartialEq)]
 // enum Statement {
@@ -60,7 +60,6 @@ fn parse_int() {
     // println!("{:#?}", Expression::Int(1225));
     assert_eq!(value, Expression::Int(1225));
     assert_eq!(value.to_string(), "(Expression (Int (1225)))");
-    panic!();
 }
 
 // #[test]
@@ -81,14 +80,14 @@ fn parse_int() {
 //     assert_eq!(value.to_string(), "(Expression (String (froging it)))");
 // }
 
-// #[test]
-// fn parse_add_operation() {
-//     let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
-//     assert_eq!(
-//         node.to_string(),
-//         "(BinaryOperation (AdditionOperation (Int (5) Int (2)))"
-//     );
-// }
+#[test]
+fn parse_add_operation() {
+    let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
+    assert_eq!(
+        node.to_string(),
+        "(BinaryOperation (AdditionOperation (Expression (Int (5))) (Expression (Int (2)))))"
+    );
+}
 
 #[test]
 fn parse_mult_operation() {
@@ -96,15 +95,15 @@ fn parse_mult_operation() {
     println!("{node:#?}");
     assert_eq!(
         node.to_string(),
-        "(BinaryOperation (MultiplicationOperation (Int (7) Int (3))))"
+        "(BinaryOperation (MultiplicationOperation (Expression (Int (7))) (Expression (Int (3)))))"
     );
 }
 
-// #[test]
-// fn parse_variable_dec() {
-//     let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
-//     assert_eq!(
-//         node.to_string(),
-//         "(VariableDeclaration (Int thing Int (5)))"
-//     )
-// }
+#[test]
+fn parse_variable_dec() {
+    let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
+    assert_eq!(
+        node.to_string(),
+        "(VariableDeclaration (Int thing (Expression (Int (5))))"
+    )
+}
