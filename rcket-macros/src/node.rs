@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
-use proc_macro_error::{abort, emit_error};
-use quote::{format_ident, quote};
+use proc_macro_error::{abort, emit_error, emit_warning};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident, Index, Path,
     PathArguments, Type, Variant, parse_macro_input,
@@ -135,18 +135,18 @@ fn derive_enum(
         .flat_map(|variant| variant_arms(variant, token_type))
         .collect();
 
+    // panic!("{}", quote! { #(#variant_match_arms)* None });
     (quote! { Self }, quote! { #(#variant_match_arms)* None })
 }
 
 fn variant_arms(variant: &Variant, token_type: &Ident) -> Vec<proc_macro2::TokenStream> {
     let variant_name = &variant.ident;
 
-    // eprintln!("{}", variant_name);
-    // panic!("{}", variant_name);
     let attribute_arms: Vec<proc_macro2::TokenStream> = variant
         .attrs
         .iter()
         .filter_map(|attribute| {
+            // panic!("GAMING: {}", attribute.to_token_stream());
             if attribute.path().is_ident("token") {
                 let path = attribute.parse_args::<Path>().ok()?;
                 Some(token_arm(variant_name, &path, token_type))
@@ -273,6 +273,8 @@ fn display_impl_struct(data_struct: &DataStruct, type_name: &Ident) -> proc_macr
 }
 
 fn display_impl_enum(data_enum: &DataEnum, type_name: &Ident) -> proc_macro2::TokenStream {
+    let type_name_str = type_name.to_string();
+
     let match_arms: Vec<proc_macro2::TokenStream> = data_enum
         .variants
         .iter()
@@ -280,13 +282,19 @@ fn display_impl_enum(data_enum: &DataEnum, type_name: &Ident) -> proc_macro2::To
             let variant_name = &variant.ident;
             let variant_name_str = variant_name.to_string();
 
-            let has_token = variant.attrs.iter().any(|attribute| attribute.path().is_ident("token"));
-            let has_extract = variant.attrs.iter().any(|attribute| attribute.path().is_ident("extract"));
+            let has_token = variant
+                .attrs
+                .iter()
+                .any(|attribute| attribute.path().is_ident("token"));
+            let has_extract = variant
+                .attrs
+                .iter()
+                .any(|attribute| attribute.path().is_ident("extract"));
 
             if has_token {
                 quote! { Self::#variant_name => write!(formatter, #variant_name_str), }
             } else if has_extract {
-                quote! { Self::#variant_name(value) => write!(formatter, "({} {})", #variant_name_str, value), }
+                quote! { Self::#variant_name(value) => write!(formatter, "({} ({} ({})))", #type_name_str, #variant_name_str, value), }
             } else if single_unnamed_field(variant).is_some() {
                 quote! { Self::#variant_name(inner) => ::std::fmt::Display::fmt(inner, formatter), }
             } else {

@@ -4,20 +4,20 @@ use rcket::{Lex, Node};
 mod frg_lexer_types;
 use frg_lexer_types::{Keyword, Literal, Symbol, Token};
 
-#[derive(Node, Debug, PartialEq)]
-enum VarType {
-    #[token(Keyword::Int)]
-    Int,
-    #[token(Keyword::Float)]
-    Float,
-    #[token(Keyword::Str)]
-    Str,
-    #[token(Keyword::Bool)]
-    Bool,
-}
+// #[derive(Node, Debug, PartialEq)]
+// enum VarType {
+//     #[token(Keyword::Int)]
+//     Int,
+//     #[token(Keyword::Float)]
+//     Float,
+//     #[token(Keyword::Str)]
+//     Str,
+//     #[token(Keyword::Bool)]
+//     Bool,
+// }
 
-#[derive(Node, Debug, PartialEq)]
-struct AdditionOperation(Box<Expression>, #[token(Symbol::Plus)] (), Box<Expression>);
+// #[derive(Node, Debug, PartialEq)]
+// struct AdditionOperation(Box<Expression>, #[token(Symbol::Plus)] (), Box<Expression>);
 
 #[derive(Node, Debug, PartialEq)]
 struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<Expression>);
@@ -25,7 +25,7 @@ struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<E
 #[derive(Node, Debug, PartialEq)]
 enum BinaryOperation {
     // #[prec(1)]
-    AdditionOperation(AdditionOperation),
+    // AdditionOperation(AdditionOperation),
     // #[prec(2)]
     MultiplicationOperation(MultiplicationOperation),
 }
@@ -34,31 +34,34 @@ enum BinaryOperation {
 enum Expression {
     #[extract(Literal::Int)]
     Int(i32),
-    #[extract(Literal::Float)]
-    Float(f32),
-    #[extract(Literal::String)]
-    String(String),
-    BinaryOperation(BinaryOperation),
+    // #[extract(Literal::Float)]
+    // Float(f32),
+    // #[extract(Literal::String)]
+    // String(String),
+    // BinaryOperation(BinaryOperation),
 }
 
-#[derive(Node, Debug, PartialEq)]
-struct VariableDeclaration(
-    VarType,
-    #[extract(Literal::Identifier)] String,
-    #[token(Symbol::Equals)] (),
-    Expression,
-);
+// #[derive(Node, Debug, PartialEq)]
+// struct VariableDeclaration(
+//     VarType,
+//     #[extract(Literal::Identifier)] String,
+//     #[token(Symbol::Equals)] (),
+//     Expression,
+// );
 
-#[derive(Node, Debug, PartialEq)]
-enum Statement {
-    VariableDeclaration(VariableDeclaration),
-}
-
-// #[test]
-// fn parse_int() {
-//     let value = Expression::parse(&Token::lex("1225")).unwrap();
-//     assert_eq!(value, Expression::Int(1225));
+// #[derive(Node, Debug, PartialEq)]
+// enum Statement {
+//     VariableDeclaration(VariableDeclaration),
 // }
+
+#[test]
+fn parse_int() {
+    let value = Expression::parse(&Token::lex("1225")).unwrap();
+    // println!("{:#?}", Expression::Int(1225));
+    assert_eq!(value, Expression::Int(1225));
+    assert_eq!(value.to_string(), "(Expression (Int (1225)))");
+    panic!();
+}
 
 // #[test]
 // fn parse_float() {
