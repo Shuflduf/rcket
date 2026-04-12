@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro_error::{abort, emit_error};
 use quote::{format_ident, quote};
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Fields, GenericArgument, Ident, Index, Path,
@@ -27,9 +28,12 @@ pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
 
     let (output_type, parse_body) = match &input.data {
         Data::Struct(data_struct) => derive_struct(data_struct, type_name, &token_type),
-        Data::Enum(data_enum) => derive_enum(data_enum, &token_type),
+        Data::Enum(data_enum) => derive_enum(data_enum, type_name, &token_type),
         _ => (quote! { Self }, quote! { todo!() }),
     };
+
+    // emit_error!("{}", type_name);
+    // panic!("{output_type}\n{parse_body}");
 
     let display_impl = match &input.data {
         Data::Struct(data_struct) => display_impl_struct(data_struct, type_name),
@@ -122,6 +126,7 @@ fn derive_struct(
 
 fn derive_enum(
     data_enum: &DataEnum,
+    type_name: &Ident,
     token_type: &Ident,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
     let variant_match_arms: Vec<proc_macro2::TokenStream> = data_enum
@@ -129,12 +134,15 @@ fn derive_enum(
         .iter()
         .flat_map(|variant| variant_arms(variant, token_type))
         .collect();
+
     (quote! { Self }, quote! { #(#variant_match_arms)* None })
 }
 
 fn variant_arms(variant: &Variant, token_type: &Ident) -> Vec<proc_macro2::TokenStream> {
     let variant_name = &variant.ident;
 
+    // eprintln!("{}", variant_name);
+    // panic!("{}", variant_name);
     let attribute_arms: Vec<proc_macro2::TokenStream> = variant
         .attrs
         .iter()

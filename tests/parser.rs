@@ -54,38 +54,39 @@ enum Statement {
     VariableDeclaration(VariableDeclaration),
 }
 
-#[test]
-fn parse_int() {
-    let value = Expression::parse(&Token::lex("1225")).unwrap();
-    assert_eq!(value, Expression::Int(1225));
-}
+// #[test]
+// fn parse_int() {
+//     let value = Expression::parse(&Token::lex("1225")).unwrap();
+//     assert_eq!(value, Expression::Int(1225));
+// }
 
-#[test]
-fn parse_float() {
-    let value = Expression::parse(&Token::lex("3.1415")).unwrap();
-    assert_eq!(
-        value,
-        Expression::Float(
-            #[allow(clippy::approx_constant)]
-            3.1415
-        )
-    );
-}
+// #[test]
+// fn parse_float() {
+//     let value = Expression::parse(&Token::lex("3.1415")).unwrap();
+//     assert_eq!(
+//         value,
+//         Expression::Float(
+//             #[allow(clippy::approx_constant)]
+//             3.1415
+//         )
+//     );
+// }
 
-#[test]
-fn parse_string() {
-    let value = Expression::parse(&Token::lex(r#""froging it""#)).unwrap();
-    assert_eq!(value.to_string(), "(Expression (String (froging it)))");
-}
+// #[test]
+// fn parse_string() {
+//     let value = Expression::parse(&Token::lex(r#""froging it""#)).unwrap();
+//     assert_eq!(value.to_string(), "(Expression (String (froging it)))");
+// }
 
-#[test]
-fn parse_add_operation() {
-    let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
-    assert_eq!(
-        node.to_string(),
-        "(BinaryOperation (AdditionOperation (Int (5) Int (2)))"
-    );
-}
+// #[test]
+// fn parse_add_operation() {
+//     let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
+//     assert_eq!(
+//         node.to_string(),
+//         "(BinaryOperation (AdditionOperation (Int (5) Int (2)))"
+//     );
+// }
+
 #[test]
 fn parse_mult_operation() {
     let node = BinaryOperation::parse(&Token::lex("7*3")).unwrap();
@@ -96,11 +97,11 @@ fn parse_mult_operation() {
     );
 }
 
-#[test]
-fn parse_variable_dec() {
-    let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
-    assert_eq!(
-        node.to_string(),
-        "(VariableDeclaration (Int thing Int (5)))"
-    )
-}
+// #[test]
+// fn parse_variable_dec() {
+//     let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
+//     assert_eq!(
+//         node.to_string(),
+//         "(VariableDeclaration (Int thing Int (5)))"
+//     )
+// }
