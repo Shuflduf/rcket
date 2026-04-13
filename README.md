@@ -13,7 +13,7 @@ It's as simple as defining a list of tokens, and defining an Abstract Syntax Tre
 # Demo
 While this is a library, you can find a demo that uses this library in the [Github Releases](https://github.com/Shuflduf/rcket/releases/latest).
 
-It is a simple expression parser and interpreter, the code for which is shown in these examples and in [/interpreter-example]
+It is a simple expression parser and interpreter, the code for which is shown in these examples and in [interpreter-example](/interpreter-example)
 
 # Installation
 You can add this library to your project through the terminal:
@@ -37,7 +37,7 @@ A lexer turns raw text into a series of tokens.
 use rcket::{Lex, Node};
 
 #[derive(Lex, Debug, PartialEq, Clone)]
-pub enum Symbol {
+enum Symbol {
     #[token("+")]
     Plus,
     #[token("-")]
@@ -49,7 +49,7 @@ pub enum Symbol {
 }
 
 #[derive(Lex, Debug, PartialEq, Clone)]
-pub enum Literal {
+enum Literal {
     #[regex(r"\d+")]
     Int(i32),
     #[regex(r"\d+\.\d+")]
@@ -57,7 +57,7 @@ pub enum Literal {
 }
 
 #[derive(Lex, Debug, PartialEq, Clone)]
-pub enum Token {
+enum Token {
     Symbol(Symbol),
     Literal(Literal),
 }
