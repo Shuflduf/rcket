@@ -52,40 +52,22 @@ struct VariableDeclaration(
 // #[derive(Node, Debug, PartialEq)]
 // enum Statement {
 //     VariableDeclaration(VariableDeclaration),
+//
 // }
 
 #[test]
 fn parse_int() {
     let value = Expression::parse(&Token::lex("1225")).unwrap();
-    // println!("{:#?}", Expression::Int(1225));
     assert_eq!(value, Expression::Int(1225));
-    assert_eq!(value.to_string(), "(Expression (Int (1225)))");
+    assert_eq!(value.to_string(), "Expression (Int (1225))");
 }
-
-// #[test]
-// fn parse_float() {
-//     let value = Expression::parse(&Token::lex("3.1415")).unwrap();
-//     assert_eq!(
-//         value,
-//         Expression::Float(
-//             #[allow(clippy::approx_constant)]
-//             3.1415
-//         )
-//     );
-// }
-
-// #[test]
-// fn parse_string() {
-//     let value = Expression::parse(&Token::lex(r#""froging it""#)).unwrap();
-//     assert_eq!(value.to_string(), "(Expression (String (froging it)))");
-// }
 
 #[test]
 fn parse_add_operation() {
     let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
     assert_eq!(
         node.to_string(),
-        "(BinaryOperation (AdditionOperation (Expression (Int (5))) (Expression (Int (2)))))"
+        "BinaryOperation (AdditionOperation (Expression (Int (5)) Expression (Int (2))))"
     );
 }
 
@@ -95,7 +77,7 @@ fn parse_mult_operation() {
     println!("{node:#?}");
     assert_eq!(
         node.to_string(),
-        "(BinaryOperation (MultiplicationOperation (Expression (Int (7))) (Expression (Int (3)))))"
+        "BinaryOperation (MultiplicationOperation (Expression (Int (7)) Expression (Int (3))))"
     );
 }
 
@@ -104,6 +86,6 @@ fn parse_variable_dec() {
     let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
     assert_eq!(
         node.to_string(),
-        "(VariableDeclaration (Int thing (Expression (Int (5))))"
+        "VariableDeclaration (Int thing Expression (Int (5)))"
     )
 }

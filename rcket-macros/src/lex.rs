@@ -85,8 +85,8 @@ fn derive_lex_enum(data_enum: &DataEnum) -> proc_macro2::TokenStream {
                             seq_lex_arm(variant_name, &patterns_vec, single_unnamed_field(variant)),
                         ));
                     }
-                } else if attribute.path().is_ident("choice") {
-                    if let Ok(patterns) = attribute
+                } else if attribute.path().is_ident("choice")
+                    && let Ok(patterns) = attribute
                         .parse_args_with(Punctuated::<LexPattern, syn::Token![,]>::parse_terminated)
                     {
                         for pattern in patterns.iter() {
@@ -101,7 +101,6 @@ fn derive_lex_enum(data_enum: &DataEnum) -> proc_macro2::TokenStream {
                             arm_pairs.push((pattern.lit.value().len(), arm));
                         }
                     }
-                }
             }
         } else if let Some(inner_type) = single_unnamed_field(variant) {
             arm_pairs.push((0, bare_lex_arm(variant_name, inner_type)));
