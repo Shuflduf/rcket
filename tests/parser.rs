@@ -36,9 +36,9 @@ enum Expression {
     Int(i32),
     // #[extract(Literal::Float)]
     // Float(f32),
-    // #[extract(Literal::String)]
-    // String(String),
-    // BinaryOperation(BinaryOperation),
+    #[extract(Literal::String)]
+    String(String),
+    BinaryOperation(BinaryOperation),
 }
 
 #[derive(Node, Debug, PartialEq)]
@@ -49,11 +49,26 @@ struct VariableDeclaration(
     Expression,
 );
 
-// #[derive(Node, Debug, PartialEq)]
-// enum Statement {
-//     VariableDeclaration(VariableDeclaration),
-//
-// }
+#[derive(Node, Debug, PartialEq)]
+enum AssignmentOp {
+    #[token(Symbol::Equals)]
+    Equal,
+    #[token(Symbol::PlusEquals)]
+    PlusEqual,
+}
+
+#[derive(Node, Debug, PartialEq)]
+struct VariableAssignment(
+    #[extract(Literal::Identifier)] String,
+    AssignmentOp,
+    Expression,
+);
+
+#[derive(Node, Debug, PartialEq)]
+enum Statement {
+    VariableDeclaration(VariableDeclaration),
+    VariableAssignment(VariableAssignment),
+}
 
 #[test]
 fn parse_int() {
@@ -64,28 +79,66 @@ fn parse_int() {
 
 #[test]
 fn parse_add_operation() {
-    let node = BinaryOperation::parse(&Token::lex("5+2")).unwrap();
     assert_eq!(
-        node.to_string(),
+        BinaryOperation::parse(&Token::lex("5+2"))
+            .unwrap()
+            .to_string(),
         "BinaryOperation (AdditionOperation (Expression (Int (5)) Expression (Int (2))))"
     );
 }
 
 #[test]
+fn parse_larger_operations() {
+    let node = BinaryOperation::parse(&Token::lex("5+2*7")).unwrap();
+    assert_eq!(node.to_string(), "TODO");
+}
+
+#[test]
 fn parse_mult_operation() {
-    let node = BinaryOperation::parse(&Token::lex("7*3")).unwrap();
-    println!("{node:#?}");
     assert_eq!(
-        node.to_string(),
+        BinaryOperation::parse(&Token::lex("7*3"))
+            .unwrap()
+            .to_string(),
         "BinaryOperation (MultiplicationOperation (Expression (Int (7)) Expression (Int (3))))"
     );
 }
 
 #[test]
 fn parse_variable_dec() {
-    let node = VariableDeclaration::parse(&Token::lex("int thing = 5")).unwrap();
     assert_eq!(
-        node.to_string(),
+        VariableDeclaration::parse(&Token::lex("int thing = 5"))
+            .unwrap()
+            .to_string(),
         "VariableDeclaration (Int thing Expression (Int (5)))"
+    )
+}
+
+#[test]
+fn parse_assignment() {
+    assert_eq!(
+        VariableAssignment::parse(&Token::lex("thing = 5"))
+            .unwrap()
+            .to_string(),
+        "VariableAssignment (thing Equal Expression (Int (5)))"
+    );
+}
+
+#[test]
+fn parse_assignment_string() {
+    assert_eq!(
+        Statement::parse(&Token::lex("thing += \"concatination!\""))
+            .unwrap()
+            .to_string(),
+        "Statement (VariableAssignment (thing PlusEqual Expression (String (concatination!))))"
+    );
+}
+
+#[test]
+fn parse_assignment_operation() {
+    assert_eq!(
+        VariableAssignment::parse(&Token::lex("OtherThing += 5 * 3"))
+            .unwrap()
+            .to_string(),
+        "TODO"
     )
 }
