@@ -24,9 +24,9 @@ struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<E
 
 #[derive(Node, Debug, PartialEq)]
 enum BinaryOperation {
-    // #[prec(1)]
+    #[prec(1)]
     AdditionOperation(AdditionOperation),
-    // #[prec(2)]
+    #[prec(2)]
     MultiplicationOperation(MultiplicationOperation),
 }
 

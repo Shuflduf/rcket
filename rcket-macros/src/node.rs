@@ -27,7 +27,7 @@ pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
 
     let (output_type, parse_body) = match &input.data {
         Data::Struct(data_struct) => derive_struct(data_struct, type_name, &token_type),
-        Data::Enum(data_enum) => derive_enum(data_enum, type_name),
+        Data::Enum(data_enum) => derive_enum(data_enum, &token_type),
         _ => (quote! { Self }, quote! { todo!() }),
     };
 
