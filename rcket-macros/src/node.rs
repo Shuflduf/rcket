@@ -27,7 +27,7 @@ pub(crate) fn derive_node(input: TokenStream) -> TokenStream {
 
     let (output_type, parse_body) = match &input.data {
         Data::Struct(data_struct) => derive_struct(data_struct, type_name, &token_type),
-        Data::Enum(data_enum) => derive_enum(data_enum, type_name, &token_type),
+        Data::Enum(data_enum) => derive_enum(data_enum, type_name),
         _ => (quote! { Self }, quote! { todo!() }),
     };
 
@@ -117,7 +117,6 @@ fn derive_struct(
 
 fn derive_enum(
     data_enum: &DataEnum,
-    _type_name: &Ident,
     token_type: &Ident,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
     let variant_match_arms: Vec<proc_macro2::TokenStream> = data_enum
