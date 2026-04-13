@@ -2,8 +2,11 @@
 name = "rcket"
 version = "0.1.0"
 edition = "2024"
-description = "Parser"
+description = "General purpose parsing library built as an alternative to Tree-sitter. Currently WIP"
+repository = "https://github.com/Shuflduf/rcket"
 license = "MIT"
+keywords = ["parser"]
+categories = ["parsing", "rust-patterns"]
 
 [dependencies]
 rcket-macros = { path = "rcket-macros" }
