@@ -17,17 +17,13 @@ enum VarType {
 }
 
 #[derive(Node, Debug, PartialEq)]
-struct AdditionOperation(Box<Expression>, #[token(Symbol::Plus)] (), Box<Expression>);
-
-#[derive(Node, Debug, PartialEq)]
-struct MultiplicationOperation(Box<Expression>, #[token(Symbol::Star)] (), Box<Expression>);
-
-#[derive(Node, Debug, PartialEq)]
 enum BinaryOperation {
+    #[infix(Symbol::Plus)]
     #[prec(1)]
-    AdditionOperation(AdditionOperation),
+    AdditionOperation(Box<Expression>, Box<Expression>),
+    #[infix(Symbol::Star)]
     #[prec(2)]
-    MultiplicationOperation(MultiplicationOperation),
+    MultiplicationOperation(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Node, Debug, PartialEq)]

@@ -6,7 +6,7 @@ mod lex;
 mod node;
 
 #[proc_macro_error]
-#[proc_macro_derive(Node, attributes(token, extract, node, prec))]
+#[proc_macro_derive(Node, attributes(token, extract, node, prec, infix))]
 pub fn derive_node(input: TokenStream) -> TokenStream {
     node::derive_node(input)
 }

@@ -13,7 +13,7 @@ It's as simple as defining a list of tokens, and defining an Abstract Syntax Tre
 # Demo
 While this is a library, you can find a demo that uses this library in the [Github Releases](https://github.com/Shuflduf/rcket/releases/latest).
 
-It is a simple expression parser and interpreter, the code for which is shown in these examples and in [interpreter-example](/interpreter-example)
+It is a simple expression parser and interpreter, the code for which is shown in these examples and in [interpreter-example](/interpreter-example).
 
 # Installation
 You can add this library to your project through the terminal:
@@ -30,7 +30,7 @@ rcket = "1.0.0" # or whatever the latest version is
 ```
 
 # Lexer
-A lexer turns raw text into a series of tokens.
+*A lexer turns raw text into a series of tokens.*
 
 ## Definition
 ```rs
@@ -87,7 +87,7 @@ assert_eq!(tokens, vec![
 ```
 
 # Parser
-A parser turns a list of tokens into a tree-like structure representing the code
+*A parser turns a list of tokens into a tree-like structure representing the code.*
 
 ## Definition
 
